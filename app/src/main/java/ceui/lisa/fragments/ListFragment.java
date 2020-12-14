@@ -25,6 +25,7 @@ import java.util.List;
 import ceui.lisa.R;
 import ceui.lisa.adapters.BaseAdapter;
 import ceui.lisa.core.BaseRepo;
+import ceui.lisa.interfaces.FeedBack;
 import ceui.lisa.utils.DensityUtil;
 import ceui.lisa.view.LinearItemDecoration;
 import ceui.lisa.view.SpacesItemDecoration;
@@ -33,7 +34,7 @@ import jp.wasabeef.recyclerview.animators.BaseItemAnimator;
 import jp.wasabeef.recyclerview.animators.LandingAnimator;
 
 public abstract class ListFragment<Layout extends ViewDataBinding, Item>
-        extends BaseFragment<Layout> {
+        extends BaseLazyFragment<Layout> {
 
     public static final long animateDuration = 400L;
     public static final int PAGE_SIZE = 20;
@@ -132,17 +133,45 @@ public abstract class ListFragment<Layout extends ViewDataBinding, Item>
             }
         });
 
+        allItems = mModel.getContent();
         mAdapter = adapter();
         if (mAdapter != null) {
             mRecyclerView.setAdapter(mAdapter);
         }
 
         onAdapterPrepared();
+    }
 
+    @Override
+    public void lazyData() {
         //进页面主动刷新
         if (autoRefresh() && !mModel.isLoaded()) {
             mRefreshLayout.autoRefresh();
         }
+    }
+
+    public void forceRefresh() {
+        scrollToTop(() -> mRefreshLayout.autoRefresh());
+    }
+
+    public void scrollToTop(FeedBack feedBack) {
+        try {
+            mRecyclerView.smoothScrollToPosition(0);
+            mRecyclerView.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (feedBack != null) {
+                        feedBack.doSomething();
+                    }
+                }
+            }, animateDuration);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void scrollToTop() {
+        scrollToTop(null);
     }
 
     public abstract void fresh();

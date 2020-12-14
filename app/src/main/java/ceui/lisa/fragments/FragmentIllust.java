@@ -51,6 +51,7 @@ import ceui.lisa.notification.BaseReceiver;
 import ceui.lisa.notification.StarReceiver;
 import ceui.lisa.utils.Common;
 import ceui.lisa.utils.DensityUtil;
+import ceui.lisa.utils.Dev;
 import ceui.lisa.utils.GlideUtil;
 import ceui.lisa.utils.Params;
 import ceui.lisa.utils.PixivOperate;
@@ -93,7 +94,7 @@ public class FragmentIllust extends SwipeFragment<FragmentIllustBinding> {
 
                 @Override
                 public void updateDrawState(TextPaint ds) {
-                    ds.setColor(getResources().getColor(R.color.new_color_primary));
+                    ds.setColor(android.R.attr.colorPrimary);
                 }
             };
             SpannableString spannableString;

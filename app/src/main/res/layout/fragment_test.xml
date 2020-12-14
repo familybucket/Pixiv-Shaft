@@ -5,11 +5,10 @@
 
     </data>
 
-    <FrameLayout
-        android:orientation="vertical"
-        android:id="@+id/fragment_container"
+    <androidx.recyclerview.widget.RecyclerView
         android:layout_width="match_parent"
+        android:id="@+id/recy_list"
         android:layout_height="match_parent">
 
-    </FrameLayout>
+    </androidx.recyclerview.widget.RecyclerView>
 </layout>

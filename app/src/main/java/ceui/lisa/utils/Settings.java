@@ -30,8 +30,28 @@ public class Settings {
     //WEB下载
     public static final String WEB_DOWNLOAD_PATH = PathUtils.getExternalPicturesPath() + "/ShaftWeb";
 
+    private int themeIndex;
+
+    public int getThemeIndex() {
+        return themeIndex;
+    }
+
+    public void setThemeIndex(int themeIndex) {
+        this.themeIndex = themeIndex;
+    }
+
     //瀑布流List点击动画
     private boolean mainListAnimate = true;
+
+    private long currentProgress = 0L;
+
+    public long getCurrentProgress() {
+        return currentProgress;
+    }
+
+    public void setCurrentProgress(long currentProgress) {
+        this.currentProgress = currentProgress;
+    }
 
     private boolean trendsForPrivate = false;
 

@@ -13,12 +13,14 @@
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/new_color_primary">
+            android:background="?attr/colorPrimary">
 
 
             <androidx.appcompat.widget.Toolbar
                 android:id="@+id/toolbar"
                 android:layout_width="match_parent"
+                android:theme="@style/AppTheme.AppBarOverlay"
+                app:popupTheme="@style/AppTheme.PopupOverlay"
                 android:layout_height="wrap_content"
                 android:elevation="@dimen/six_dp"
                 android:fitsSystemWindows="true"
@@ -42,7 +44,7 @@
                 android:id="@+id/tab_layout"
                 android:layout_width="match_parent"
                 android:layout_height="35dp"
-                android:background="@color/new_color_primary"
+                android:background="?attr/colorPrimary"
                 app:tabIndicatorColor="@android:color/white"
                 app:tabIndicatorFullWidth="false"
                 app:tabMode="fixed"
@@ -61,3 +63,4 @@
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 </layout>
+

@@ -1,12 +1,14 @@
 package ceui.lisa.core;
 
 import android.net.Uri;
+import android.text.TextUtils;
 
 import androidx.documentfile.provider.DocumentFile;
 
 import java.io.Serializable;
 import java.util.UUID;
 
+import ceui.lisa.download.FileCreator;
 import ceui.lisa.models.IllustsBean;
 import ceui.lisa.utils.Common;
 
@@ -16,13 +18,23 @@ public class DownloadItem implements Serializable {
     private String url;
     private String showUrl;
     private String uuid;
-    private Uri uri;
-    private IllustsBean illust;
-    private DocumentFile mFile;
+    private final IllustsBean illust;
+    private int index;
 
-    public DownloadItem(IllustsBean illustsBean) {
+    public DownloadItem(IllustsBean illustsBean, int index) {
         this.illust = illustsBean;
         this.uuid = UUID.randomUUID().toString();
+        this.name = FileCreator.customFileName(illustsBean, index);
+        this.index = index;
+        Common.showLog("随机生成一个UUID");
+    }
+
+    public int getIndex() {
+        return index;
+    }
+
+    public void setIndex(int index) {
+        this.index = index;
     }
 
     public String getShowUrl() {
@@ -33,22 +45,8 @@ public class DownloadItem implements Serializable {
         this.showUrl = showUrl;
     }
 
-    public DocumentFile getFile() {
-        return mFile;
-    }
-
-    public void setFile(DocumentFile file) {
-        mFile = file;
-        name = mFile.getName();
-        uri = mFile.getUri();
-    }
-
     public String getUuid() {
         return uuid;
-    }
-
-    public Uri getUri() {
-        return uri;
     }
 
     public void setUuid(String uuid) {
@@ -74,5 +72,11 @@ public class DownloadItem implements Serializable {
     public void setUrl(String url) {
         Common.showLog("DownloadItem 准备下载：" + url);
         this.url = url;
+    }
+
+    public boolean isSame(DownloadItem next) {
+        return next != null &&
+                TextUtils.equals(name, next.name) &&
+                TextUtils.equals(url, next.url);
     }
 }

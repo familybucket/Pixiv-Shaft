@@ -1,11 +1,10 @@
 package ceui.lisa.activities;
 
+import android.Manifest;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Bundle;
-import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.view.KeyEvent;
 import android.view.MenuItem;
@@ -19,11 +18,13 @@ import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentPagerAdapter;
+import androidx.viewpager.widget.ViewPager;
 
+import com.blankj.utilcode.util.UriUtils;
 import com.bumptech.glide.Glide;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationView;
-
-import java.io.File;
+import com.tbruyelle.rxpermissions3.RxPermissions;
 
 import ceui.lisa.R;
 import ceui.lisa.core.Manager;
@@ -38,6 +39,7 @@ import ceui.lisa.utils.Local;
 import ceui.lisa.utils.Params;
 import ceui.lisa.utils.ReverseImage;
 import ceui.lisa.utils.ReverseWebviewCallback;
+import io.reactivex.rxjava3.disposables.Disposable;
 
 import static ceui.lisa.activities.Shaft.sUserModel;
 
@@ -78,7 +80,68 @@ public class MainActivity extends BaseActivity<ActivityCoverBinding>
                 Common.showUser(mContext, sUserModel);
             }
         });
-        baseBind.viewPager.setOffscreenPageLimit(3);
+        baseBind.navigationView.setOnNavigationItemSelectedListener(new BottomNavigationView.OnNavigationItemSelectedListener() {
+            @Override
+            public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+                if (item.getItemId() == R.id.action_1) {
+                    if (baseBind.viewPager.getCurrentItem() != 0) {
+                        baseBind.viewPager.setCurrentItem(0);
+                    }
+                    return true;
+                } else if (item.getItemId() == R.id.action_2) {
+                    if (baseBind.viewPager.getCurrentItem() != 1) {
+                        baseBind.viewPager.setCurrentItem(1);
+                    }
+                    return true;
+                } else if (item.getItemId() == R.id.action_3) {
+                    if (baseBind.viewPager.getCurrentItem() != 2) {
+                        baseBind.viewPager.setCurrentItem(2);
+                    }
+                    return true;
+                }
+                return false;
+            }
+        });
+        baseBind.navigationView.setOnNavigationItemReselectedListener(new BottomNavigationView.OnNavigationItemReselectedListener() {
+            @Override
+            public void onNavigationItemReselected(@NonNull MenuItem item) {
+                if (item.getItemId() == R.id.action_1) {
+                    if (baseFragments[0] instanceof FragmentLeft) {
+                        ((FragmentLeft) baseFragments[0]).scrollToTop();
+                    }
+                } else if (item.getItemId() == R.id.action_2) {
+                    if (baseFragments[1] instanceof FragmentCenter) {
+                        ((FragmentCenter) baseFragments[1]).lazyData();
+                    }
+                } else if (item.getItemId() == R.id.action_3) {
+                    if (baseFragments[2] instanceof FragmentRight) {
+                        ((FragmentRight) baseFragments[2]).scrollToTop();
+                    }
+                }
+            }
+        });
+        baseBind.viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override
+            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+
+            }
+
+            @Override
+            public void onPageSelected(int position) {
+                if (position == 0) {
+                    baseBind.navigationView.setSelectedItemId(R.id.action_1);
+                } else if (position == 1) {
+                    baseBind.navigationView.setSelectedItemId(R.id.action_2);
+                } else {
+                    baseBind.navigationView.setSelectedItemId(R.id.action_3);
+                }
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int state) {
+
+            }
+        });
     }
 
     private void initFragment() {
@@ -98,13 +161,28 @@ public class MainActivity extends BaseActivity<ActivityCoverBinding>
                 return baseFragments.length;
             }
         });
-        baseBind.navigationView.setupWithViewPager(baseBind.viewPager);
+        Manager.get().restore(mContext);
     }
 
     @Override
     protected void initData() {
         if (sUserModel != null && sUserModel.getResponse().getUser().isIs_login()) {
-            initFragment();
+            if (Common.isAndroidQ()) {
+                initFragment();
+            } else {
+                new RxPermissions(mActivity)
+                        .requestEachCombined(
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE
+                        )
+                        .subscribe(permission -> {
+                            if (permission.granted) {
+                                initFragment();
+                            } else {
+                                Common.showToast(mActivity.getString(R.string.access_denied));
+                                finish();
+                            }
+                        });
+            }
         } else {
             Intent intent = new Intent(mContext, TemplateActivity.class);
             intent.putExtra(TemplateActivity.EXTRA_FRAGMENT, "登录注册");
@@ -162,10 +240,10 @@ public class MainActivity extends BaseActivity<ActivityCoverBinding>
                 intent.putExtra(TemplateActivity.EXTRA_FRAGMENT, "精华列");
                 break;
             case R.id.nav_fans:
-                intent = new Intent(mContext, TemplateActivity.class);
                 if (Dev.isDev) {
-                    intent.putExtra(TemplateActivity.EXTRA_FRAGMENT, "任务中心");
+                    intent = new Intent(mContext, VPActivity.class);
                 } else {
+                    intent = new Intent(mContext, TemplateActivity.class);
                     intent.putExtra(TemplateActivity.EXTRA_FRAGMENT, "粉丝");
                 }
                 break;
@@ -201,9 +279,10 @@ public class MainActivity extends BaseActivity<ActivityCoverBinding>
     }
 
     private void selectPhoto() {
-        Intent intentToPickPic = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-        intentToPickPic.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*");
-        startActivityForResult(intentToPickPic, Params.REQUEST_CODE_CHOOSE);
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);//必须
+        intent.setType("image/*");//必须
+        startActivityForResult(intent, Params.REQUEST_CODE_CHOOSE);
     }
 
     private void initDrawerHeader() {
@@ -221,9 +300,12 @@ public class MainActivity extends BaseActivity<ActivityCoverBinding>
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == Params.REQUEST_CODE_CHOOSE && resultCode == RESULT_OK) {
-            Uri imageUri = data.getData();
-            ReverseImage.reverse(new File(Common.getRealFilePath(mContext, imageUri)),
-                    ReverseImage.ReverseProvider.SauceNao, new ReverseWebviewCallback(this));
+            try {
+                ReverseImage.reverse(UriUtils.uri2Bytes(data.getData()),
+                        ReverseImage.ReverseProvider.SauceNao, new ReverseWebviewCallback(this));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -250,6 +332,7 @@ public class MainActivity extends BaseActivity<ActivityCoverBinding>
                 builder.setPositiveButton(mContext.getString(R.string.sure), new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
+                        Manager.get().stop();
                         finish();
                     }
                 });

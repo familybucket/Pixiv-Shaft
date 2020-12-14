@@ -333,7 +333,7 @@ public class FragmentSingleIllust extends BaseFragment<FragmentSingleIllustBindi
 
         SpannableString sizeString = new SpannableString(String.format("尺寸：%s",
                 illust.getSize()));
-        sizeString.setSpan(new ForegroundColorSpan(mContext.getResources().getColor(R.color.colorPrimary)),
+        sizeString.setSpan(new ForegroundColorSpan(android.R.attr.colorPrimary),
                 3, illust.getSize().length() + 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         baseBind.illustPx.setText(sizeString);
         List<String> tags = new ArrayList<>();
@@ -378,7 +378,7 @@ public class FragmentSingleIllust extends BaseFragment<FragmentSingleIllustBindi
 
         SpannableString userString = new SpannableString(String.format("用户ID：%s",
                 String.valueOf(illust.getUser().getId())));
-        userString.setSpan(new ForegroundColorSpan(mContext.getResources().getColor(R.color.colorPrimary)),
+        userString.setSpan(new ForegroundColorSpan(android.R.attr.colorPrimary),
                 5, String.valueOf(illust.getUser().getId()).length() + 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         baseBind.userId.setText(userString);
         baseBind.userId.setOnClickListener(new View.OnClickListener() {
@@ -389,7 +389,7 @@ public class FragmentSingleIllust extends BaseFragment<FragmentSingleIllustBindi
         });
         SpannableString illustString = new SpannableString(String.format("作品ID：%s",
                 String.valueOf(illust.getId())));
-        illustString.setSpan(new ForegroundColorSpan(mContext.getResources().getColor(R.color.colorPrimary)),
+        illustString.setSpan(new ForegroundColorSpan(android.R.attr.colorPrimary),
                 5, String.valueOf(illust.getId()).length() + 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         baseBind.illustId.setText(illustString);
         baseBind.illustId.setOnClickListener(new View.OnClickListener() {
@@ -424,15 +424,6 @@ public class FragmentSingleIllust extends BaseFragment<FragmentSingleIllustBindi
         }
     }
 
-//    @Override
-//    public void onPause() {
-//        super.onPause();
-//        //如果是GIF，停止播放
-//        if (illust != null && "ugoira".equals(illust.getType()) && mDetailAdapter != null) {
-//            mDetailAdapter.nowStopGif();
-//        }
-//    }
-
     @Override
     public void vertical() {
         //竖屏
@@ -449,20 +440,4 @@ public class FragmentSingleIllust extends BaseFragment<FragmentSingleIllustBindi
         headParams.height = Shaft.statusHeight * 3 / 5 + Shaft.toolbarHeight;
         baseBind.head.setLayoutParams(headParams);
     }
-
-//    @Override
-//    public void setUserVisibleHint(boolean isVisibleToUser) {
-//        super.setUserVisibleHint(isVisibleToUser);
-//        if (illust != null) {
-//            if (isVisibleToUser) {
-//                if ("ugoira".equals(illust.getType()) && mDetailAdapter != null) {
-//                    mDetailAdapter.nowPlayGif();
-//                }
-//            } else {
-//                if ("ugoira".equals(illust.getType()) && mDetailAdapter != null) {
-//                    mDetailAdapter.nowStopGif();
-//                }
-//            }
-//        }
-//    }
 }

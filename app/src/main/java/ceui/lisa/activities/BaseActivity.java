@@ -2,10 +2,12 @@ package ceui.lisa.activities;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
+import android.net.ConnectivityManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
@@ -16,7 +18,9 @@ import androidx.databinding.DataBindingUtil;
 import androidx.databinding.ViewDataBinding;
 import androidx.fragment.app.FragmentActivity;
 
+import ceui.lisa.R;
 import ceui.lisa.interfaces.FeedBack;
+import ceui.lisa.notification.NetWorkStateReceiver;
 import ceui.lisa.utils.Common;
 import ceui.lisa.utils.Local;
 
@@ -36,6 +40,8 @@ public abstract class BaseActivity<Layout extends ViewDataBinding> extends AppCo
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         try {
+            updateTheme();
+
             mLayoutID = initLayout();
 
             mContext = this;
@@ -110,9 +116,10 @@ public abstract class BaseActivity<Layout extends ViewDataBinding> extends AppCo
             }
             Uri treeUri = data.getData();
             Shaft.sSettings.setRootPathUri(treeUri.toString());
-            mContext.getContentResolver().takePersistableUriPermission(treeUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION |
-                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            final int takeFlags = data.getFlags()
+                    & (Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            mContext.getContentResolver().takePersistableUriPermission(treeUri,takeFlags);
             Local.setSettings(Shaft.sSettings);
             doAfterGranted();
         }
@@ -126,5 +133,44 @@ public abstract class BaseActivity<Layout extends ViewDataBinding> extends AppCo
 
     public void setFeedBack(FeedBack feedBack) {
         mFeedBack = feedBack;
+    }
+
+    private void updateTheme() {
+        int current = Shaft.sSettings.getThemeIndex();
+        switch (current) {
+            case 0:
+                setTheme(R.style.AppTheme_Index0);
+                break;
+            case 1:
+                setTheme(R.style.AppTheme_Index1);
+                break;
+            case 2:
+                setTheme(R.style.AppTheme_Index2);
+                break;
+            case 3:
+                setTheme(R.style.AppTheme_Index3);
+                break;
+            case 4:
+                setTheme(R.style.AppTheme_Index4);
+                break;
+            case 5:
+                setTheme(R.style.AppTheme_Index5);
+                break;
+            case 6:
+                setTheme(R.style.AppTheme_Index6);
+                break;
+            case 7:
+                setTheme(R.style.AppTheme_Index7);
+                break;
+            case 8:
+                setTheme(R.style.AppTheme_Index8);
+                break;
+            case 9:
+                setTheme(R.style.AppTheme_Index9);
+                break;
+            default:
+                setTheme(R.style.AppTheme_Default);
+                break;
+        }
     }
 }
