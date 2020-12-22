@@ -1,8 +1,10 @@
 package ceui.lisa.download;
 
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.text.TextUtils;
+import android.util.Log;
 
 import androidx.documentfile.provider.DocumentFile;
 
@@ -10,6 +12,11 @@ import com.qmuiteam.qmui.skin.QMUISkinManager;
 import com.qmuiteam.qmui.widget.dialog.QMUIDialog;
 import com.qmuiteam.qmui.widget.dialog.QMUIDialogAction;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,11 +27,14 @@ import ceui.lisa.activities.Shaft;
 import ceui.lisa.core.DownloadItem;
 import ceui.lisa.core.Manager;
 import ceui.lisa.core.SAFile;
+import ceui.lisa.core.UrlFactory;
 import ceui.lisa.interfaces.Callback;
 import ceui.lisa.interfaces.FeedBack;
 import ceui.lisa.models.GifResponse;
 import ceui.lisa.models.IllustsBean;
 import ceui.lisa.utils.Common;
+
+import static android.provider.DocumentsContract.EXTRA_INITIAL_URI;
 
 public class IllustDownload {
 
@@ -34,11 +44,11 @@ public class IllustDownload {
                 DownloadItem item = new DownloadItem(illust, 0);
                 item.setUrl(getUrl(illust, 0));
                 item.setShowUrl(getShowUrl(illust, 0));
+                Common.showToast(1 + "个任务已经加入下载队列");
                 Manager.get().addTask(item, activity);
             }
         });
     }
-
 
     public static void downloadIllust(IllustsBean illust, int index, BaseActivity<?> activity) {
         check(activity, () -> {
@@ -48,6 +58,7 @@ public class IllustDownload {
                 DownloadItem item = new DownloadItem(illust, index);
                 item.setUrl(getUrl(illust, index));
                 item.setShowUrl(getShowUrl(illust, index));
+                Common.showToast(1 + "个任务已经加入下载队列");
                 Manager.get().addTask(item, activity);
             }
         });
@@ -66,6 +77,7 @@ public class IllustDownload {
                     item.setShowUrl(getShowUrl(illust, i));
                     tempList.add(item);
                 }
+                Common.showToast(tempList.size() + "个任务已经加入下载队列");
                 Manager.get().addTasks(tempList, activity);
             }
         });
@@ -94,17 +106,16 @@ public class IllustDownload {
                     }
                 }
             }
+            Common.showToast(tempList.size() + "个任务已经加入下载队列");
             Manager.get().addTasks(tempList, activity);
         });
     }
 
-    public static void downloadGif(GifResponse response, DocumentFile file, IllustsBean illust, BaseActivity<?> activity) {
-        check(activity, () -> {
-            DownloadItem item = new DownloadItem(illust, 0);
-            item.setUrl(response.getUgoira_metadata().getZip_urls().getMedium());
-            item.setShowUrl(illust.getImage_urls().getMedium());
-            Manager.get().addTask(item, activity);
-        });
+    public static void downloadGif(GifResponse response, IllustsBean illust, BaseActivity<?> activity) {
+        DownloadItem item = new DownloadItem(illust, 0);
+        item.setUrl(response.getUgoira_metadata().getZip_urls().getMedium());
+        item.setShowUrl(UrlFactory.invoke(illust.getImage_urls().getMedium()));
+        Manager.get().addTask(item, activity);
     }
 
     public static void downloadNovel(BaseActivity<?> activity, String displayName, String content, Callback<Uri> targetCallback) {
@@ -132,14 +143,63 @@ public class IllustDownload {
         });
     }
 
+    public static void saveGif(File fromGif, IllustsBean illust, BaseActivity<?> activity) {
+        check(activity, () -> {
+            DocumentFile file = SAFile.getGifDocument(activity, illust);
+            if (file != null) {
+                if (copyFile(fromGif, file.getUri(), activity)) {
+                    Common.showToast("GIF保存成功");
+                }
+            }
+        });
+    }
+
+    public static boolean copyFile(File src, Uri des, Context context) {
+        if (!src.exists()) {
+            Log.e("cppyFile", "file not exist:" + src.getAbsolutePath());
+            return false;
+        }
+        BufferedInputStream bis = null;
+        BufferedOutputStream bos = null;
+        try {
+            bis = new BufferedInputStream(new FileInputStream(src));
+            bos = new BufferedOutputStream(context.getContentResolver().openOutputStream(des));
+            byte[] buffer = new byte[4 * 1024];
+            int count;
+            while ((count = bis.read(buffer, 0, buffer.length)) != -1) {
+                if (count > 0) {
+                    bos.write(buffer, 0, count);
+                }
+            }
+            bos.flush();
+            return true;
+        } catch (Exception e) {
+            Log.e("copyFile", "exception:", e);
+        } finally {
+            if (bis != null) {
+                try {
+                    bis.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (bos != null) {
+                try {
+                    bos.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return false;
+    }
+
     public static String getUrl(IllustsBean illust, int index) {
         if (illust.getPage_count() == 1) {
-            return "https://pixiv.cat/" + illust.getId() + "." + getMimeType(illust, index);
+            return UrlFactory.invoke(illust.getMeta_single_page().getOriginal_image_url());
         } else {
-            return "https://pixiv.cat/" + illust.getId() +
-                    "-" + (index + 1) + "." + getMimeType(illust, index);
+            return UrlFactory.invoke(illust.getMeta_pages().get(index).getImage_urls().getOriginal());
         }
-//        return "http://update.9158.com/miaolive/Miaolive.apk";
     }
 
     public static String getShowUrl(IllustsBean illust, int index) {
@@ -148,21 +208,6 @@ public class IllustDownload {
         } else {
             return illust.getMeta_pages().get(index).getImage_urls().getMedium();
         }
-    }
-
-    public static String getMimeType(IllustsBean illust, int index) {
-        String url;
-        if (illust.getPage_count() == 1) {
-            url = illust.getMeta_single_page().getOriginal_image_url();
-        } else {
-            url = illust.getMeta_pages().get(index).getImage_urls().getOriginal();
-        }
-
-        String result = "png";
-        if (url.contains(".")) {
-            result = url.substring(url.lastIndexOf(".") + 1);
-        }
-        return result;
     }
 
     public static void check(BaseActivity<?> activity, FeedBack feedBack) {
@@ -178,8 +223,20 @@ public class IllustDownload {
                     .addAction(0, activity.getResources().getString(R.string.string_312),
                             (dialog, index) -> {
                                 try {
-                                    activity.startActivityForResult(
-                                            new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), BaseActivity.ASK_URI);
+                                    new Thread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                                            Uri start;
+                                            if (!TextUtils.isEmpty(Shaft.sSettings.getRootPathUri())) {
+                                                start = Uri.parse(Shaft.sSettings.getRootPathUri());
+                                            } else {
+                                                start = Uri.parse("content://com.android.externalstorage.documents/document/primary:Download");
+                                            }
+                                            intent.putExtra(EXTRA_INITIAL_URI, start);
+                                            activity.startActivityForResult(intent, BaseActivity.ASK_URI);
+                                        }
+                                    }).start();
                                 } catch (Exception e) {
                                     Common.showToast(e.toString());
                                     e.printStackTrace();

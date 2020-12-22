@@ -25,10 +25,9 @@ public class FileCreator {
 
     public static File createGifUnZipFolder(IllustsBean illustsBean) {
         return new File(Shaft.sSettings.getGifZipPath(), deleteSpecialWords(
-                illustsBean.getTitle() + "_" + illustsBean.getId())
+                illustsBean.getTitle() + "_" + illustsBean.getId() + "_unzip")
         );
     }
-
 
 
     public static File createGifFile(IllustsBean illustsBean) {
@@ -133,10 +132,20 @@ public class FileCreator {
                         }
                         break;
                     case P_SIZE:
-                        if (!TextUtils.isEmpty(fileName)) {
-                            fileName = fileName + "_p" + index;
+                        if (Shaft.sSettings.isHasP0()) {
+                            if (!TextUtils.isEmpty(fileName)) {
+                                fileName = fileName + "_p" + index;
+                            } else {
+                                fileName = "p" + index;
+                            }
                         } else {
-                            fileName = "p" + index;
+                            if (illustsBean.getPage_count() != 1) {
+                                if (!TextUtils.isEmpty(fileName)) {
+                                    fileName = fileName + "_p" + (index + 1);
+                                } else {
+                                    fileName = "p" + (index + 1);
+                                }
+                            }
                         }
                         break;
                     case USER_ID:

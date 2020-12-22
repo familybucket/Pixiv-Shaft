@@ -13,7 +13,6 @@ import androidx.viewpager.widget.ViewPager;
 
 import com.ToxicBakery.viewpager.transforms.DrawerTransformer;
 import com.blankj.utilcode.util.BarUtils;
-import com.google.android.material.tabs.TabLayout;
 
 import ceui.lisa.R;
 import ceui.lisa.activities.Shaft;
@@ -85,7 +84,6 @@ public class FragmentCollection extends BaseFragment<ViewpagerWithTablayoutBindi
             };
         }
 
-        BarUtils.setStatusBarColor(mActivity, android.R.attr.colorPrimary);
         if (type == 0) {
             baseBind.toolbarTitle.setText(R.string.string_319);
         } else if (type == 1) {

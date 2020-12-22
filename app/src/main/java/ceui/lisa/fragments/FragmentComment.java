@@ -10,7 +10,6 @@ import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.blankj.utilcode.util.BarUtils;
 import com.effective.android.panel.PanelSwitchHelper;
 import com.qmuiteam.qmui.skin.QMUISkinManager;
 import com.qmuiteam.qmui.widget.dialog.QMUIDialog;
@@ -222,10 +221,10 @@ public class FragmentComment extends NetListFragment<FragmentCommentBinding,
                 alertDialog.show();
                 alertDialog
                         .getButton(AlertDialog.BUTTON_POSITIVE)
-                        .setTextColor(android.R.attr.colorPrimary);
+                        .setTextColor(R.attr.colorPrimary);
                 alertDialog
                         .getButton(AlertDialog.BUTTON_NEGATIVE)
-                        .setTextColor(android.R.attr.colorPrimary);
+                        .setTextColor(R.attr.colorPrimary);
                 return;
             }
 

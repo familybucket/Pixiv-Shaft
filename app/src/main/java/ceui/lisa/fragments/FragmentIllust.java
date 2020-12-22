@@ -28,7 +28,6 @@ import com.bumptech.glide.Glide;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.qmuiteam.qmui.skin.QMUISkinManager;
 import com.qmuiteam.qmui.widget.dialog.QMUIDialog;
-import com.qmuiteam.qmui.widget.dialog.QMUIDialogAction;
 import com.scwang.smartrefresh.layout.SmartRefreshLayout;
 import com.zhy.view.flowlayout.FlowLayout;
 import com.zhy.view.flowlayout.TagAdapter;
@@ -51,7 +50,6 @@ import ceui.lisa.notification.BaseReceiver;
 import ceui.lisa.notification.StarReceiver;
 import ceui.lisa.utils.Common;
 import ceui.lisa.utils.DensityUtil;
-import ceui.lisa.utils.Dev;
 import ceui.lisa.utils.GlideUtil;
 import ceui.lisa.utils.Params;
 import ceui.lisa.utils.PixivOperate;
@@ -94,7 +92,7 @@ public class FragmentIllust extends SwipeFragment<FragmentIllustBinding> {
 
                 @Override
                 public void updateDrawState(TextPaint ds) {
-                    ds.setColor(android.R.attr.colorPrimary);
+                    ds.setColor(R.attr.colorPrimary);
                 }
             };
             SpannableString spannableString;
@@ -312,14 +310,10 @@ public class FragmentIllust extends SwipeFragment<FragmentIllustBinding> {
         baseBind.totalView.setText(String.valueOf(illust.getTotal_view()));
         baseBind.totalLike.setText(String.valueOf(illust.getTotal_bookmarks()));
         baseBind.download.setOnClickListener(v -> {
-            if (illust.isGif()) {
-                GifCreate.createGif(illust);
+            if (illust.getPage_count() == 1) {
+                IllustDownload.downloadIllust(illust, (BaseActivity<?>) mContext);
             } else {
-                if (illust.getPage_count() == 1) {
-                    IllustDownload.downloadIllust(illust, (BaseActivity<?>) mContext);
-                } else {
-                    IllustDownload.downloadAllIllust(illust, (BaseActivity<?>) mContext);
-                }
+                IllustDownload.downloadAllIllust(illust, (BaseActivity<?>) mContext);
             }
         });
         baseBind.download.setOnLongClickListener(new View.OnLongClickListener() {
@@ -360,7 +354,7 @@ public class FragmentIllust extends SwipeFragment<FragmentIllustBinding> {
             }
         });
         Glide.with(mContext)
-                .load(GlideUtil.getMediumImg(illust.getUser().getProfile_image_urls().getMedium()))
+                .load(GlideUtil.getUrl(illust.getUser().getProfile_image_urls().getMedium()))
                 .into(baseBind.userHead);
     }
 

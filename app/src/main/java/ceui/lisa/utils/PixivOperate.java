@@ -3,6 +3,7 @@ package ceui.lisa.utils;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.BitmapFactory;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
@@ -10,32 +11,49 @@ import android.widget.Button;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import com.blankj.utilcode.util.FileUtils;
 import com.blankj.utilcode.util.UriUtils;
 import com.blankj.utilcode.util.ZipUtils;
+import com.waynejo.androidndkgif.GifEncoder;
 
 import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.io.inputstream.ZipInputStream;
+import net.lingala.zip4j.model.LocalFileHeader;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
 
 import ceui.lisa.R;
 import ceui.lisa.activities.Shaft;
 import ceui.lisa.activities.TemplateActivity;
 import ceui.lisa.activities.VActivity;
+import ceui.lisa.cache.Cache;
 import ceui.lisa.core.Container;
 import ceui.lisa.core.PageData;
 import ceui.lisa.core.SAFile;
+import ceui.lisa.core.TryCatchObserverImpl;
 import ceui.lisa.database.AppDatabase;
 import ceui.lisa.database.IllustHistoryEntity;
 import ceui.lisa.database.SearchEntity;
 import ceui.lisa.database.TagMuteEntity;
+import ceui.lisa.download.FileCreator;
 import ceui.lisa.fragments.FragmentLogin;
 import ceui.lisa.http.ErrorCtrl;
 import ceui.lisa.http.NullCtrl;
 import ceui.lisa.http.Retro;
+import ceui.lisa.interfaces.FeedBack;
 import ceui.lisa.model.ListIllust;
 import ceui.lisa.models.GifResponse;
 import ceui.lisa.models.IllustSearchResponse;
@@ -45,6 +63,9 @@ import ceui.lisa.models.NullResponse;
 import ceui.lisa.models.TagsBean;
 import ceui.lisa.models.UserModel;
 import ceui.lisa.models.IllustsBean;
+import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.schedulers.Schedulers;
 import retrofit2.Call;
@@ -284,23 +305,6 @@ public class PixivOperate {
                 .subscribe(errorCtrl);
     }
 
-    public static void unzipGif(DocumentFile file, IllustsBean illust, Context context) {
-        try {
-            Common.showLog(file.getName());
-            if (!TextUtils.isEmpty(file.getName()) && file.getName().contains(".zip")) {
-                try {
-                    ZipFile zipFile = new ZipFile(UriUtils.uri2File(file.getUri()));
-                    zipFile.extractAll(UriUtils.uri2File(SAFile.findGifUnzipFolder(context, illust).getUri()).getPath());
-                    Common.showToast("图组ZIP解压完成");
-                } catch (ZipException e) {
-                    e.printStackTrace();
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     public static void muteTag(TagsBean tagsBean) {
         TagMuteEntity tagMuteEntity = new TagMuteEntity();
         String tagName = tagsBean.getName();
@@ -390,5 +394,88 @@ public class PixivOperate {
         }
 
         return result;
+    }
+
+    public static void justUnzipFile(File fromZipFile, File toFolder) {
+        try {
+            ZipUtils.unzipFile(fromZipFile, toFolder);
+            Common.showLog("justUnzipFile 解压成功");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void encodeGif(Context context, File parentFile, IllustsBean illustsBean) {
+        try {
+            Common.showLog("encodeGif 开始");
+            Observable.create(new ObservableOnSubscribe<String>() {
+                @Override
+                public void subscribe(ObservableEmitter<String> emitter) throws Exception {
+                    Common.showLog("encodeGif 开始生成gif图");
+                    final File[] listfile = parentFile.listFiles();
+
+                    List<File> allFiles = Arrays.asList(listfile);
+                    Collections.sort(allFiles, new Comparator<File>() {
+                        @Override
+                        public int compare(File o1, File o2) {
+                            if (Integer.valueOf(o1.getName().substring(0, o1.getName().length() - 4)) >
+                                    Integer.valueOf(o2.getName().substring(0, o2.getName().length() - 4))) {
+                                return 1;
+                            } else {
+                                return -1;
+                            }
+                        }
+                    });
+
+                    File gifFile = SAFile.createZipResultFile(context, FileCreator.createGifFile(illustsBean).getName());
+                    Common.showLog("gifFile " + gifFile.getPath());
+
+                    GifEncoder gifEncoder = new GifEncoder();
+                    gifEncoder.init(illustsBean.getWidth(), illustsBean.getHeight(), gifFile.getPath(),
+                            GifEncoder.EncodingType.ENCODING_TYPE_NORMAL_LOW_MEMORY);
+
+                    GifResponse gifResponse = Cache.get().getModel(Params.ILLUST_ID + "_" + illustsBean.getId(), GifResponse.class);
+                    int delayMs = 60;
+                    if (gifResponse != null) {
+                        delayMs = gifResponse.getDelay();
+                        Common.showLog("GifResponse " + gifResponse.toString());
+                    } else {
+                        Common.showLog("GifResponse null ");
+                    }
+
+                    Common.showLog("allFiles size " + allFiles.size());
+
+
+                    for (File singleImage : allFiles) {
+                        Common.showLog("编码中 00 " + allFiles.size());
+                        gifEncoder.encodeFrame(BitmapFactory.decodeFile(singleImage.getPath()), delayMs);
+                    }
+
+                    gifEncoder.close();
+
+                    Common.showLog("gifFile gifFile " + FileUtils.getSize(gifFile));
+
+                    Intent intent = new Intent(Params.PLAY_GIF);
+                    intent.putExtra(Params.ID, illustsBean.getId());
+                    LocalBroadcastManager.getInstance(Shaft.getContext()).sendBroadcast(intent);
+                }
+            }).subscribeOn(Schedulers.newThread())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe(new TryCatchObserverImpl<>());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void unzipAndePlay(Context context, IllustsBean illustsBean) {
+        try {
+            File fromZip = SAFile.createZipFile(context,
+                    FileCreator.createGifZipFile(illustsBean).getName());
+            File toFolder = SAFile.createCacheUnzipFolder(context, illustsBean);
+            justUnzipFile(fromZip, toFolder);
+            encodeGif(context, toFolder, illustsBean);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

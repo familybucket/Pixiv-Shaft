@@ -140,6 +140,13 @@ public abstract class ListFragment<Layout extends ViewDataBinding, Item>
         }
 
         onAdapterPrepared();
+
+        if (!isLazy()) {
+            //进页面主动刷新
+            if (autoRefresh() && !mModel.isLoaded()) {
+                mRefreshLayout.autoRefresh();
+            }
+        }
     }
 
     @Override

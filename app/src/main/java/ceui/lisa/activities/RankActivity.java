@@ -35,6 +35,7 @@ public class RankActivity extends BaseActivity<ActivityMultiViewPagerBinding> im
     protected void initView() {
         setSupportActionBar(baseBind.toolbar);
         baseBind.toolbar.setNavigationOnClickListener(v -> finish());
+        baseBind.toolbarTitle.setText("排行榜");
         dataType = getIntent().getStringExtra("dataType");
         queryDate = getIntent().getStringExtra("date");
         baseBind.viewPager.setPageTransformer(true, new DrawerTransformer());
@@ -150,7 +151,7 @@ public class RankActivity extends BaseActivity<ActivityMultiViewPagerBinding> im
             start.set(2008, 1, 1);
             dpd.setMinDate(start);
             dpd.setMaxDate(now);
-            dpd.setAccentColor(android.R.attr.colorPrimary);
+            dpd.setAccentColor(R.attr.colorPrimary);
             dpd.show(getFragmentManager(), "DatePickerDialog");
             return true;
         }

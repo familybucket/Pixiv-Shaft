@@ -1,32 +1,34 @@
 package ceui.lisa.fragments;
 
-import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
-import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.blankj.utilcode.util.BarUtils;
-import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.GlideException;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
-import com.github.chrisbanes.photoview.OnOutsidePhotoTapListener;
-import com.github.chrisbanes.photoview.OnPhotoTapListener;
+
+import java.io.File;
 
 import ceui.lisa.R;
 import ceui.lisa.activities.Shaft;
+import ceui.lisa.core.GlideApp;
+import ceui.lisa.core.UrlFactory;
 import ceui.lisa.databinding.FragmentImageDetailBinding;
+import ceui.lisa.download.IllustDownload;
 import ceui.lisa.models.IllustsBean;
 import ceui.lisa.utils.Common;
-import ceui.lisa.utils.GlideUtil;
+import ceui.lisa.utils.GlideUrlChild;
 import ceui.lisa.utils.Params;
-
-import static com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions.withCrossFade;
+import me.jessyan.progressmanager.ProgressListener;
+import me.jessyan.progressmanager.ProgressManager;
+import me.jessyan.progressmanager.body.ProgressInfo;
 
 public class FragmentImageDetail extends BaseFragment<FragmentImageDetailBinding> {
 
@@ -65,92 +67,51 @@ public class FragmentImageDetail extends BaseFragment<FragmentImageDetailBinding
 
     @Override
     protected void initData() {
-        baseBind.illustImage.setTransitionName("big_image_" + index);
         BarUtils.setNavBarVisibility(mActivity, false);
-        if (!TextUtils.isEmpty(url)) {
-            Glide.with(mContext)
-                    .load(GlideUtil.getMediumImg(url))
-                    .transition(withCrossFade())
-                    .listener(new RequestListener<Drawable>() {
-                        @Override
-                        public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-                            baseBind.progress.setVisibility(View.INVISIBLE);
-                            return false;
-                        }
-
-                        @Override
-                        public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
-                            mActivity.startPostponedEnterTransition();
-                            baseBind.progress.setVisibility(View.INVISIBLE);
-                            return false;
-                        }
-                    })
-                    .into(baseBind.illustImage);
-        } else {
-            baseBind.reload.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    loadImage();
-                }
-            });
-            loadImage();
-        }
+        loadImage();
     }
 
     private void loadImage() {
-        baseBind.reload.setVisibility(View.INVISIBLE);
-        baseBind.progress.setVisibility(View.VISIBLE);
-        RequestListener<Drawable> requestListener = new RequestListener<Drawable>() {
-            @Override
-            public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Drawable> target, boolean isFirstResource) {
-                baseBind.progress.setVisibility(View.INVISIBLE);
-                baseBind.reload.setVisibility(View.VISIBLE);
-                Common.showToast("加载失败，点击重试");
-                return false;
-            }
-
-            @Override
-            public boolean onResourceReady(Drawable resource, Object model, Target<Drawable> target, DataSource dataSource, boolean isFirstResource) {
-                baseBind.progress.setVisibility(View.INVISIBLE);
-                if (Shaft.sSettings.isFirstImageSize()) {
-
-                } else {
-                    mActivity.startPostponedEnterTransition();
-                }
-                return false;
-            }
-        };
-        if (Shaft.sSettings.isFirstImageSize()) {
-            Common.showLog(className + "展示原图");
-            Glide.with(mContext)
-                    .load(GlideUtil.getOriginal(mIllustsBean, index))
-                    .transition(withCrossFade())
-                    .listener(requestListener)
-                    .into(baseBind.illustImage);
+        final String imageUrl;
+        if (!TextUtils.isEmpty(url)) {
+            imageUrl = url;
         } else {
-            Common.showLog(className + "展示大图");
-            Glide.with(mContext)
-                    .load(GlideUtil.getLargeImage(mIllustsBean, index))
-                    .transition(withCrossFade())
-                    .listener(requestListener)
-                    .into(baseBind.illustImage);
+            if (Shaft.sSettings.isShowOriginalImage()) {
+                imageUrl = IllustDownload.getUrl(mIllustsBean, index);
+            } else {
+                imageUrl = UrlFactory.invoke(mIllustsBean.getImage_urls().getLarge());
+            }
         }
-    }
+        ProgressManager.getInstance().addResponseListener(imageUrl, new ProgressListener() {
+            @Override
+            public void onProgress(ProgressInfo progressInfo) {
+                baseBind.progressLayout.donutProgress.setProgress(progressInfo.getPercent());
+            }
 
-    @Override
-    public void initView() {
-        baseBind.illustImage.setOnPhotoTapListener(new OnPhotoTapListener() {
             @Override
-            public void onPhotoTap(ImageView view, float x, float y) {
-                mActivity.onBackPressed();
+            public void onError(long id, Exception e) {
+
             }
         });
-        baseBind.illustImage.setOnOutsidePhotoTapListener(new OnOutsidePhotoTapListener() {
-            @Override
-            public void onOutsidePhotoTap(ImageView imageView) {
-                mActivity.onBackPressed();
-            }
-        });
+        GlideApp.with(mContext)
+                .asFile()
+                .load(new GlideUrlChild(imageUrl))
+                .listener(new RequestListener<File>() {
+                    @Override
+                    public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<File> target, boolean isFirstResource) {
+                        baseBind.progressLayout.donutProgress.setVisibility(View.INVISIBLE);
+                        return false;
+                    }
+
+                    @Override
+                    public boolean onResourceReady(File resource, Object model, Target<File> target, DataSource dataSource, boolean isFirstResource) {
+                        baseBind.progressLayout.donutProgress.setVisibility(View.INVISIBLE);
+                        baseBind.realIllustImage.setImageURI(Uri.fromFile(resource));
+                        Common.showLog("onResourceReady " + resource.getPath());
+                        return false;
+                    }
+                })
+                .submit();
     }
 
     @Override

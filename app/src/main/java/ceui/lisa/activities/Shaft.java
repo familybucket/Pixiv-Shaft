@@ -11,6 +11,7 @@ import com.google.gson.Gson;
 import com.scwang.smartrefresh.layout.SmartRefreshLayout;
 import com.scwang.smartrefresh.layout.footer.ClassicsFooter;
 import com.scwang.smartrefresh.layout.header.ClassicsHeader;
+import com.tencent.mmkv.MMKV;
 
 import ceui.lisa.R;
 import ceui.lisa.helper.ThemeHelper;
@@ -21,6 +22,8 @@ import ceui.lisa.utils.Dev;
 import ceui.lisa.utils.Local;
 import ceui.lisa.utils.Params;
 import ceui.lisa.utils.Settings;
+import me.jessyan.progressmanager.ProgressManager;
+import okhttp3.OkHttpClient;
 
 import static ceui.lisa.utils.Local.LOCAL_DATA;
 
@@ -31,6 +34,7 @@ public class Shaft extends Application {
     public static Gson sGson;
     public static SharedPreferences sPreferences;
     protected NetWorkStateReceiver netWorkStateReceiver;
+    private OkHttpClient mOkHttpClient;
 
     /**
      * 状态栏高度，初始化
@@ -75,6 +79,9 @@ public class Shaft extends Application {
 
         ThemeHelper.applyTheme(null, sSettings.getThemeType());
 
+
+        this.mOkHttpClient = ProgressManager.getInstance().with(new OkHttpClient.Builder()).build();
+
         //计算状态栏高度并赋值
         statusHeight = 0;
         int resourceId = sContext.getResources().getIdentifier("status_bar_height", "dimen", "android");
@@ -86,9 +93,16 @@ public class Shaft extends Application {
         if (netWorkStateReceiver == null) {
             netWorkStateReceiver = new NetWorkStateReceiver();
         }
+
+        MMKV.initialize(this);
+
         IntentFilter filter = new IntentFilter();
         filter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
         registerReceiver(netWorkStateReceiver, filter);
+    }
+
+    public OkHttpClient getOkHttpClient() {
+        return mOkHttpClient;
     }
 
     private void updateTheme() {

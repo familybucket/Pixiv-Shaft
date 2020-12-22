@@ -13,8 +13,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityOptionsCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -38,7 +36,6 @@ import ceui.lisa.adapters.IllustDetailAdapter;
 import ceui.lisa.databinding.FragmentSingleIllustBinding;
 import ceui.lisa.dialogs.MuteDialog;
 import ceui.lisa.download.FileCreator;
-import ceui.lisa.download.GifCreate;
 import ceui.lisa.download.IllustDownload;
 import ceui.lisa.interfaces.OnItemClickListener;
 import ceui.lisa.models.IllustsBean;
@@ -111,17 +108,7 @@ public class FragmentSingleIllust extends BaseFragment<FragmentSingleIllustBindi
                     intent.putExtra("illust", illust);
                     intent.putExtra("dataType", "二级详情");
                     intent.putExtra("index", position);
-                    if (Shaft.sSettings.isFirstImageSize()) {
-                        mActivity.startActivity(intent);
-                    } else {
-                        if (mDetailAdapter.getHasLoad().get(position)) {
-                            Bundle bundle = ActivityOptionsCompat.makeSceneTransitionAnimation(mActivity,
-                                    v, "big_image_" + position).toBundle();
-                            startActivity(intent, bundle);
-                        } else {
-                            mActivity.startActivity(intent);
-                        }
-                    }
+                    mActivity.startActivity(intent);
                 } else if (viewType == 1) {
 
                 }
@@ -326,14 +313,14 @@ public class FragmentSingleIllust extends BaseFragment<FragmentSingleIllustBindi
         });
 
         Glide.with(mContext)
-                .load(GlideUtil.getMediumImg(illust.getUser().getProfile_image_urls().getMedium()))
+                .load(GlideUtil.getUrl(illust.getUser().getProfile_image_urls().getMedium()))
                 .into(baseBind.userHead);
 
         baseBind.userName.setText(illust.getUser().getName());
 
         SpannableString sizeString = new SpannableString(String.format("尺寸：%s",
                 illust.getSize()));
-        sizeString.setSpan(new ForegroundColorSpan(android.R.attr.colorPrimary),
+        sizeString.setSpan(new ForegroundColorSpan(R.attr.colorPrimary),
                 3, illust.getSize().length() + 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         baseBind.illustPx.setText(sizeString);
         List<String> tags = new ArrayList<>();
@@ -378,7 +365,7 @@ public class FragmentSingleIllust extends BaseFragment<FragmentSingleIllustBindi
 
         SpannableString userString = new SpannableString(String.format("用户ID：%s",
                 String.valueOf(illust.getUser().getId())));
-        userString.setSpan(new ForegroundColorSpan(android.R.attr.colorPrimary),
+        userString.setSpan(new ForegroundColorSpan(R.attr.colorPrimary),
                 5, String.valueOf(illust.getUser().getId()).length() + 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         baseBind.userId.setText(userString);
         baseBind.userId.setOnClickListener(new View.OnClickListener() {
@@ -389,7 +376,7 @@ public class FragmentSingleIllust extends BaseFragment<FragmentSingleIllustBindi
         });
         SpannableString illustString = new SpannableString(String.format("作品ID：%s",
                 String.valueOf(illust.getId())));
-        illustString.setSpan(new ForegroundColorSpan(android.R.attr.colorPrimary),
+        illustString.setSpan(new ForegroundColorSpan(R.attr.colorPrimary),
                 5, String.valueOf(illust.getId()).length() + 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         baseBind.illustId.setText(illustString);
         baseBind.illustId.setOnClickListener(new View.OnClickListener() {

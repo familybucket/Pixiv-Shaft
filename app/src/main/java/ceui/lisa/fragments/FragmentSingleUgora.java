@@ -6,11 +6,13 @@ import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.graphics.drawable.AnimationDrawable;
 import android.graphics.drawable.Drawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
+import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,14 +23,21 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import com.blankj.utilcode.util.FileUtils;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 import com.bumptech.glide.request.target.SimpleTarget;
 import com.bumptech.glide.request.transition.Transition;
 import com.scwang.smartrefresh.layout.footer.FalsifyFooter;
 import com.scwang.smartrefresh.layout.header.FalsifyHeader;
+import com.tencent.mmkv.MMKV;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -42,6 +51,7 @@ import ceui.lisa.activities.SearchActivity;
 import ceui.lisa.activities.Shaft;
 import ceui.lisa.activities.TemplateActivity;
 import ceui.lisa.activities.UserActivity;
+import ceui.lisa.cache.Cache;
 import ceui.lisa.core.Manager;
 import ceui.lisa.core.SAFile;
 import ceui.lisa.databinding.FragmentUgoraBinding;
@@ -49,11 +59,13 @@ import ceui.lisa.dialogs.MuteDialog;
 import ceui.lisa.download.FileCreator;
 import ceui.lisa.download.GifCreate;
 import ceui.lisa.download.IllustDownload;
+import ceui.lisa.download.ImageSaver;
 import ceui.lisa.http.ErrorCtrl;
 import ceui.lisa.interfaces.Callback;
 import ceui.lisa.models.GifResponse;
 import ceui.lisa.models.IllustsBean;
 import ceui.lisa.notification.BaseReceiver;
+import ceui.lisa.notification.PlayReceiver;
 import ceui.lisa.notification.StarReceiver;
 import ceui.lisa.utils.Common;
 import ceui.lisa.utils.GlideUtil;
@@ -79,6 +91,7 @@ public class FragmentSingleUgora extends BaseFragment<FragmentUgoraBinding> {
 
     private IllustsBean illust;
     private StarReceiver mReceiver;
+    private PlayReceiver mPlayReceiver;
 
     public static FragmentSingleUgora newInstance(IllustsBean illust) {
         Bundle args = new Bundle();
@@ -139,100 +152,102 @@ public class FragmentSingleUgora extends BaseFragment<FragmentUgoraBinding> {
             loadImage();
         }
 
-        IntentFilter intentFilter = new IntentFilter();
-        mReceiver = new StarReceiver(new BaseReceiver.CallBack() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                Bundle bundle = intent.getExtras();
-                if (bundle != null) {
-                    int id = bundle.getInt(Params.ID);
-                    if (illust.getId() == id) {
-                        boolean isLiked = bundle.getBoolean(Params.IS_LIKED);
-                        if (isLiked) {
-                            illust.setIs_bookmarked(true);
-                            baseBind.postLike.setImageResource(R.drawable.ic_favorite_red_24dp);
-                        } else {
-                            illust.setIs_bookmarked(false);
-                            baseBind.postLike.setImageResource(R.drawable.ic_favorite_grey_24dp);
+        {
+            IntentFilter intentFilter = new IntentFilter();
+            mReceiver = new StarReceiver(new BaseReceiver.CallBack() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    Bundle bundle = intent.getExtras();
+                    if (bundle != null) {
+                        int id = bundle.getInt(Params.ID);
+                        if (illust.getId() == id) {
+                            boolean isLiked = bundle.getBoolean(Params.IS_LIKED);
+                            if (isLiked) {
+                                illust.setIs_bookmarked(true);
+                                baseBind.postLike.setImageResource(R.drawable.ic_favorite_red_24dp);
+                            } else {
+                                illust.setIs_bookmarked(false);
+                                baseBind.postLike.setImageResource(R.drawable.ic_favorite_grey_24dp);
+                            }
                         }
                     }
                 }
-            }
-        });
-        intentFilter.addAction(Params.LIKED_ILLUST);
-        LocalBroadcastManager.getInstance(mContext).registerReceiver(mReceiver, intentFilter);
+            });
+            intentFilter.addAction(Params.LIKED_ILLUST);
+            LocalBroadcastManager.getInstance(mContext).registerReceiver(mReceiver, intentFilter);
+        }
+
+        {
+            IntentFilter intentFilter = new IntentFilter();
+            mPlayReceiver = new PlayReceiver(new BaseReceiver.CallBack() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    baseBind.progressLayout.donutProgress.setVisibility(View.GONE);
+                    Bundle bundle = intent.getExtras();
+                    if (bundle != null) {
+                        int id = bundle.getInt(Params.ID);
+                        if (illust.getId() == id) {
+                            nowPlayGif();
+                        }
+                    }
+                }
+            });
+            intentFilter.addAction(Params.PLAY_GIF);
+            LocalBroadcastManager.getInstance(mContext).registerReceiver(mPlayReceiver, intentFilter);
+        }
     }
 
     @Override
     public void onDestroy() {
-        if (mReceiver != null) {
+        try {
             LocalBroadcastManager.getInstance(mContext).unregisterReceiver(mReceiver);
+            LocalBroadcastManager.getInstance(mContext).unregisterReceiver(mPlayReceiver);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         super.onDestroy();
     }
 
-    private AnimationDrawable animationDrawable;
-
-    public void tryPlayGif(DocumentFile parentFile, int delay) {
-        if (parentFile != null && parentFile.isDirectory()) {
-            //获取所有的gif帧
-            final DocumentFile[] listfile = parentFile.listFiles();
-            Observable.create(new ObservableOnSubscribe<String>() {
-                @Override
-                public void subscribe(ObservableEmitter<String> emitter) {
-                    try {
-                        List<DocumentFile> allFiles = Arrays.asList(listfile);
-                        Collections.sort(allFiles, new Comparator<DocumentFile>() {
-                            @Override
-                            public int compare(DocumentFile o1, DocumentFile o2) {
-                                if (Integer.valueOf(o1.getName().substring(0, o1.getName().length() - 4)) >
-                                        Integer.valueOf(o2.getName().substring(0, o2.getName().length() - 4))) {
-                                    return 1;
-                                } else {
-                                    return -1;
-                                }
-                            }
-                        });
-
-                        animationDrawable = new AnimationDrawable();
-                        for (int i = 0; i < allFiles.size(); i++) {
-
-                            Drawable drawable = Glide.with(mContext)
-                                    .load(allFiles.get(i).getUri())
-                                    .skipMemoryCache(true)
-                                    .submit()
-                                    .get();
-                            animationDrawable.addFrame(drawable, delay);
-
-                        }
-                        emitter.onNext("万事俱备");
-                    } catch (ExecutionException | InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }).subscribeOn(Schedulers.io())
-                    .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(new ErrorCtrl<String>() {
-                        @Override
-                        public void next(String s) {
-                            if ("万事俱备".equals(s)) {
-                                nowPlayGif();
-                            }
-                        }
-                    });
-        }
-    }
-
     public void nowPlayGif() {
-        if (animationDrawable != null) {
-            baseBind.illustImage.setImageDrawable(animationDrawable);
-            animationDrawable.start();
-        }
-    }
-
-    public void nowStopGif() {
-        if (animationDrawable != null) {
-            animationDrawable.stop();
+        File gifFile = SAFile.createZipResultFile(mContext, FileCreator.createGifFile(illust).getName());
+        Common.showLog("nowPlayGif " + gifFile.getPath());
+        if (gifFile.exists() && gifFile.length() > 1024) {
+            Common.showLog("GIF文件已存在，直接播放");
+            baseBind.playGif.setVisibility(View.INVISIBLE);
+            baseBind.progressLayout.donutProgress.setVisibility(View.INVISIBLE);
+            Glide.with(mContext)
+                    .load(gifFile)
+                    .into(baseBind.illustImage);
+        } else {
+            boolean hasDownload = MMKV.defaultMMKV().decodeBool(Params.ILLUST_ID + "_" + illust.getId());
+            File zipFile = SAFile.createZipFile(mContext, FileCreator.createGifZipFile(illust).getName());
+            if (hasDownload && zipFile.exists() && zipFile.length() > 1024) {
+                PixivOperate.unzipAndePlay(mContext, illust);
+            } else {
+                PixivOperate.getGifInfo(illust, new ErrorCtrl<GifResponse>() {
+                    @Override
+                    public void next(GifResponse gifResponse) {
+                        Cache.get().saveModel(Params.ILLUST_ID + "_" + illust.getId(), gifResponse);
+                        IllustDownload.downloadGif(gifResponse, illust, (BaseActivity<?>) mContext);
+                        if (illust.getId() == Manager.get().getCurrentIllustID()) {
+                            Manager.get().setCallback(new Callback<Progress>() {
+                                @Override
+                                public void doSomething(Progress t) {
+                                    try {
+                                        if (illust.getId() == Manager.get().getCurrentIllustID()) {
+                                            baseBind.playGif.setVisibility(View.INVISIBLE);
+                                            baseBind.progressLayout.donutProgress.setVisibility(View.VISIBLE);
+                                            baseBind.progressLayout.donutProgress.setProgress(t.getProgress());
+                                        }
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -250,29 +265,28 @@ public class FragmentSingleUgora extends BaseFragment<FragmentUgoraBinding> {
             return;
         }
 
-        Manager.get().setCallback(new Callback<Progress>() {
-            @Override
-            public void doSomething(Progress t) {
+        if (illust.getId() == Manager.get().getCurrentIllustID()) {
+            Manager.get().setCallback(new Callback<Progress>() {
+                @Override
+                public void doSomething(Progress t) {
+                    try {
+                        if (illust.getId() == Manager.get().getCurrentIllustID()) {
+                            baseBind.playGif.setVisibility(View.INVISIBLE);
+                            baseBind.progressLayout.donutProgress.setVisibility(View.VISIBLE);
+                            baseBind.progressLayout.donutProgress.setProgress(t.getProgress());
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+        }
 
-            }
-        });
 
         baseBind.playGif.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Common.showToast("重构中，暂不支持");
-//                PixivOperate.getGifInfo(illust, new ErrorCtrl<GifResponse>() {
-//                    @Override
-//                    public void next(GifResponse gifResponse) {
-//                        DocumentFile file = SAFile.findGifFile(mContext, illust);
-//                        if (file != null && file.length() > 1024) {
-//                            tryPlayGif(SAFile.findGifUnzipFolder(mContext, illust), gifResponse.getDelay());
-//                        } else {
-//                            IllustDownload.downloadGif(gifResponse,
-//                                    SAFile.createGifFile(mContext, illust), illust, (BaseActivity<?>) mContext);
-//                        }
-//                    }
-//                });
+                nowPlayGif();
             }
         });
 
@@ -303,15 +317,14 @@ public class FragmentSingleUgora extends BaseFragment<FragmentUgoraBinding> {
         });
 
         baseBind.download.setOnClickListener(v -> {
-            if (illust.isGif()) {
-                GifCreate.createGif(illust);
-            } else {
-                if (illust.getPage_count() == 1) {
-                    IllustDownload.downloadIllust(illust, (BaseActivity<?>) mContext);
-                } else {
-                    IllustDownload.downloadAllIllust(illust, (BaseActivity<?>) mContext);
-                }
-            }
+            Common.showToast("暂时仅支持播放，后续版本支持下载");
+//            File gifFile = SAFile.createZipResultFile(mContext, FileCreator.createGifFile(illust).getName());
+//            Common.showLog("nowPlayGif " + gifFile.getPath());
+//            if (gifFile.exists() && gifFile.length() > 1024) {
+//                IllustDownload.saveGif(gifFile, illust, (BaseActivity<?>) mActivity);
+//            } else {
+//                Common.showToast("请先播放后下载");
+//            }
         });
         File file = FileCreator.createIllustFile(illust);
         if (file.exists()) {
@@ -424,14 +437,14 @@ public class FragmentSingleUgora extends BaseFragment<FragmentUgoraBinding> {
         });
 
         Glide.with(mContext)
-                .load(GlideUtil.getMediumImg(illust.getUser().getProfile_image_urls().getMedium()))
+                .load(GlideUtil.getUrl(illust.getUser().getProfile_image_urls().getMedium()))
                 .into(baseBind.userHead);
 
         baseBind.userName.setText(illust.getUser().getName());
 
         SpannableString sizeString = new SpannableString(String.format("尺寸：%s",
                 illust.getSize()));
-        sizeString.setSpan(new ForegroundColorSpan(android.R.attr.colorPrimary),
+        sizeString.setSpan(new ForegroundColorSpan(R.attr.colorPrimary),
                 3, illust.getSize().length() + 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         baseBind.illustPx.setText(sizeString);
         List<String> tags = new ArrayList<>();
@@ -472,7 +485,7 @@ public class FragmentSingleUgora extends BaseFragment<FragmentUgoraBinding> {
 
         SpannableString userString = new SpannableString(String.format("用户ID：%s",
                 String.valueOf(illust.getUser().getId())));
-        userString.setSpan(new ForegroundColorSpan(android.R.attr.colorPrimary),
+        userString.setSpan(new ForegroundColorSpan(R.attr.colorPrimary),
                 5, String.valueOf(illust.getUser().getId()).length() + 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         baseBind.userId.setText(userString);
         baseBind.userId.setOnClickListener(new View.OnClickListener() {
@@ -483,7 +496,7 @@ public class FragmentSingleUgora extends BaseFragment<FragmentUgoraBinding> {
         });
         SpannableString illustString = new SpannableString(String.format("作品ID：%s",
                 String.valueOf(illust.getId())));
-        illustString.setSpan(new ForegroundColorSpan(android.R.attr.colorPrimary),
+        illustString.setSpan(new ForegroundColorSpan(R.attr.colorPrimary),
                 5, String.valueOf(illust.getId()).length() + 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         baseBind.illustId.setText(illustString);
         baseBind.illustId.setOnClickListener(new View.OnClickListener() {

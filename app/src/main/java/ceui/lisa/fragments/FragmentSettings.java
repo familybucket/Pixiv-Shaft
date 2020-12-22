@@ -2,22 +2,24 @@ package ceui.lisa.fragments;
 
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.net.Uri;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.CompoundButton;
-import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.blankj.utilcode.util.FileUtils;
 import com.blankj.utilcode.util.LanguageUtils;
+import com.blankj.utilcode.util.UriUtils;
 import com.qmuiteam.qmui.skin.QMUISkinManager;
 import com.qmuiteam.qmui.widget.dialog.QMUIDialog;
 import com.qmuiteam.qmui.widget.dialog.QMUIDialogAction;
 import com.scwang.smartrefresh.layout.SmartRefreshLayout;
 import com.scwang.smartrefresh.layout.footer.FalsifyFooter;
 import com.scwang.smartrefresh.layout.header.FalsifyHeader;
+import com.tencent.mmkv.MMKV;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Locale;
 
@@ -25,12 +27,14 @@ import ceui.lisa.R;
 import ceui.lisa.activities.BaseActivity;
 import ceui.lisa.activities.Shaft;
 import ceui.lisa.activities.TemplateActivity;
+import ceui.lisa.core.SAFile;
 import ceui.lisa.databinding.FragmentSettingsBinding;
 import ceui.lisa.helper.ThemeHelper;
 import ceui.lisa.utils.Common;
 import ceui.lisa.utils.Local;
 import ceui.lisa.utils.Params;
 
+import static android.provider.DocumentsContract.EXTRA_INITIAL_URI;
 import static ceui.lisa.fragments.FragmentFilter.ALL_SIZE_VALUE;
 import static ceui.lisa.utils.Settings.ALL_LANGUAGE;
 
@@ -129,21 +133,6 @@ public class FragmentSettings extends SwipeFragment<FragmentSettingsBinding> {
             @Override
             public void onClick(View v) {
                 baseBind.saveHistory.performClick();
-            }
-        });
-
-        baseBind.singleDownloadTask.setChecked(Shaft.sSettings.isSingleDownloadTask());
-        baseBind.singleDownloadTask.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                Common.showToast("设置成功", 2);
-                Local.setSettings(Shaft.sSettings);
-            }
-        });
-        baseBind.singleDownloadTaskRela.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                baseBind.singleDownloadTask.performClick();
             }
         });
 
@@ -263,16 +252,16 @@ public class FragmentSettings extends SwipeFragment<FragmentSettingsBinding> {
             }
         });
 
-        baseBind.firstDetailOrigin.setChecked(Shaft.sSettings.isFirstImageSize());
+        baseBind.firstDetailOrigin.setChecked(Shaft.sSettings.isUsePixivCat());
         baseBind.firstDetailOrigin.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if (isChecked) {
-                    Shaft.sSettings.setFirstImageSize(true);
+                    Shaft.sSettings.setUsePixivCat(true);
                 } else {
-                    Shaft.sSettings.setFirstImageSize(false);
+                    Shaft.sSettings.setUsePixivCat(false);
                 }
-                Common.showToast("设置成功", 2);
+                Common.showToast("设置成功");
                 Local.setSettings(Shaft.sSettings);
             }
         });
@@ -283,14 +272,49 @@ public class FragmentSettings extends SwipeFragment<FragmentSettingsBinding> {
             }
         });
 
+        //是否显示原图
+        baseBind.showOriginalImage.setChecked(Shaft.sSettings.isShowOriginalImage());
+        baseBind.showOriginalImage.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                Shaft.sSettings.setShowOriginalImage(isChecked);
+                Common.showToast("设置成功");
+                Local.setSettings(Shaft.sSettings);
+            }
+        });
+        baseBind.showOriginalImageRela.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                baseBind.showOriginalImage.performClick();
+            }
+        });
+
+
         setPath();
-        baseBind.illustPath.setOnClickListener(new View.OnClickListener() {
+        baseBind.singleIllustPath.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (Common.isAndroidQ()) {
-                    freshPath = true;
-                    mActivity.startActivityForResult(
-                            new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), BaseActivity.ASK_URI);
+                    try {
+                        new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                freshPath = true;
+                                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                                Uri start;
+                                if (!TextUtils.isEmpty(Shaft.sSettings.getRootPathUri())) {
+                                    start = Uri.parse(Shaft.sSettings.getRootPathUri());
+                                } else {
+                                    start = Uri.parse("content://com.android.externalstorage.documents/document/primary:Download");
+                                }
+                                intent.putExtra(EXTRA_INITIAL_URI, start);
+                                mActivity.startActivityForResult(intent, BaseActivity.ASK_URI);
+                            }
+                        }).start();
+                    } catch (Exception e) {
+                        Common.showToast("手机系统被阉割，没这个功能：" + e.toString(), true);
+                        e.printStackTrace();
+                    }
                 } else {
                     Common.showToast(getString(R.string.string_329), true);
                 }
@@ -417,10 +441,24 @@ public class FragmentSettings extends SwipeFragment<FragmentSettingsBinding> {
             }
         });
 
+        baseBind.imageCacheSize.setText(FileUtils.getSize(SAFile.getImageCache(mContext)));
+        baseBind.clearImageCache.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                FileUtils.deleteAllInDir(SAFile.getImageCache(mContext));
+                Common.showToast("图片缓存清除成功！");
+                baseBind.imageCacheSize.setText(FileUtils.getSize(SAFile.getImageCache(mContext)));
+            }
+        });
+
+        baseBind.gifCacheSize.setText(FileUtils.getSize(SAFile.getGifCache(mContext)));
         baseBind.clearGifCache.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
+                MMKV.defaultMMKV().clearAll();
+                FileUtils.deleteAllInDir(SAFile.getGifCache(mContext));
+                Common.showToast("GIF缓存清除成功！");
+                baseBind.gifCacheSize.setText(FileUtils.getSize(SAFile.getGifCache(mContext)));
             }
         });
         baseBind.refreshLayout.setRefreshHeader(new FalsifyHeader(mContext));
